@@ -72,6 +72,7 @@
   "min_price": 3.0,
   "min_open_interest": 500,
   "max_spread_pct": 0.8,
+  "min_quote_oi": 10,
   "min_dte": 3,
   "max_dte": 120,
   "workers": 3,

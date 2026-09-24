@@ -129,7 +129,8 @@ def atm_for_expiry(tk, exp, spot, today):
     if calls.empty or puts.empty:
         return None
     # Median IV over the 3 strikes nearest spot, calls and puts, skipping quotes
-    # with no bid or a spread wider than max_spread_pct of mid. Single ATM quotes are often
+    # with no bid, a spread wider than max_spread_pct of mid, or open interest
+    # under min_quote_oi. Single ATM quotes are often
     # stale (e.g. a put priced 4x through parity), which a median shrugs off.
     ivs = []
     for df, is_call in ((calls, True), (puts, False)):
@@ -138,6 +139,8 @@ def atm_for_expiry(tk, exp, spot, today):
             b, a = row.get("bid") or 0, row.get("ask") or 0
             if b <= 0 or a < b or (a - b) / ((a + b) / 2) > CFG["max_spread_pct"]:
                 continue
+            if (row.get("openInterest") or 0) < CFG["min_quote_oi"]:
+                continue            # untraded strikes carry stale quotes (PBH 45C bid 11.5 on a $45.7 stock)
             v = implied_vol((a + b) / 2, spot, row.strike, t, RISK_FREE, is_call)
             if v and v < 5.0:       # >500% here means a stale or crossed quote, not a real IV
                 ivs.append(v)
