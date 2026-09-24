@@ -87,6 +87,7 @@
     "max_rows": 15
   },
   "earnings_window_days": 14,
+  "max_catalysts": 2,
   "scorecard_lag_sessions": 5,
   "explode_weights": {
     "term_ratio": 0.3,

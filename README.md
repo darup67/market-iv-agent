@@ -41,7 +41,13 @@ Read-only. It never trades. Email is the only channel: no banner and no sound.
    - **Bear / Base / Bull prices** from the front expiry's implied distribution,
      with put IV on the downside and call IV on the upside: about 16% odds below
      Bear, 50% inside the Base range and 16% above Bull.
-5. **Volume filter:** only names that traded at least `min_email_volume` (500)
+5. **Catalysts** (`catalysts.py`): pending events from the RTTNews FDA calendar
+   (PDUFA dates, panels) and clinical-trial calendar (topline readouts), plus Yahoo
+   earnings, cached for a day in `data/catalysts.json`. Company-guided windows
+   ("Q4 2026", "2H 2026") are kept as windows. An event is flagged ⚠ when it can
+   land before the front option expiry. `catalysts_manual.json` fills gaps for
+   tickers the calendars don't cover.
+6. **Volume filter:** only names that traded at least `min_email_volume` (500)
    option contracts today appear in the email lists.
 
 **What the score means:** the options market expects a large move soon, which
@@ -91,6 +97,8 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.plist
 | Path | What |
 |---|---|
 | `agent.py` | the whole agent |
+| `catalysts.py` | FDA / clinical-trial calendar scraper and matcher |
+| `catalysts_manual.json` | hand-added events for tickers the calendars miss |
 | `config.json` | universe ETFs, extra tickers, filters, score weights, email |
 | `data/history.csv` | daily IV30 etc. per ticker (drives IV rank and 1d change) |
 | `data/picks.csv` | daily top picks (drives the scorecard) |
