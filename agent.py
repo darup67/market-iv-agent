@@ -188,6 +188,32 @@ def side_iv(df, spot, sd, t, is_call):
     return None
 
 
+def unusual_activity(points, spot):
+    """Contracts whose volume today is large, above open interest (new positions),
+    and carries real premium. Uses every fetched expiry, not just the near ones."""
+    u = CFG["uoa"]
+    hits = []
+    for p in points:
+        for df, is_call in ((p["_calls"], True), (p["_puts"], False)):
+            for _, r in df[df.vol_today >= u["min_volume"]].iterrows():
+                oi = int(r.get("openInterest") or 0)
+                b, a, last = r.get("bid") or 0, r.get("ask") or 0, r.get("lastPrice") or 0
+                prem = r.vol_today * last * 100
+                if r.vol_today < u["min_vol_oi"] * max(oi, 1) or prem < u["min_premium"]:
+                    continue
+                if b > 0 and a >= b and last > 0:
+                    side = "bought" if last >= (a + b) / 2 else "sold"
+                    lean = "Bull" if (side == "bought") == is_call else "Bear"
+                else:
+                    side, lean = "?", "?"
+                hits.append({"contract": f"{p['exp'][5:]} ${r.strike:g}{'C' if is_call else 'P'}",
+                             "dte": p["dte"], "volume": int(r.vol_today), "oi": oi,
+                             "premium": round(prem), "side": side, "lean": lean,
+                             "otm": round((r.strike / spot - 1) * (1 if is_call else -1), 3)})
+    hits.sort(key=lambda h: -h["premium"])
+    return hits[:5]
+
+
 def flow_metrics(points, spot):
     """Call vs put positioning across the near-term chains (≤45 DTE, else the front one).
 
@@ -205,6 +231,7 @@ def flow_metrics(points, spot):
     poi = sum(p["_puts"].openInterest.fillna(0).sum() for p in near)
 
     signed, gross, strikes = 0.0, 0.0, []
+    uoa = unusual_activity(points, spot)
     for p in near:
         for df, is_call in ((p["_calls"], True), (p["_puts"], False)):
             for _, r in df[df.vol_today > 0].iterrows():
@@ -262,6 +289,8 @@ def flow_metrics(points, spot):
         "base_lo": round(spot * math.exp(-0.674 * fsd_dn), 2),  # 50% odds inside base range
         "base_hi": round(spot * math.exp(0.674 * fsd_up), 2),
         "bull": round(spot * math.exp(fsd_up), 2),               # ~16% odds of closing above
+        "uoa": json.dumps(uoa) if uoa else "",
+        "uoa_n": len(uoa),
         "top_strikes": " | ".join(f"{k} {int(v):,} {sd_}" + (f" (OI {oi:,})" if oi else "")
                                   for v, k, sd_, oi in strikes[:3]),
     }
@@ -487,6 +516,45 @@ def money(x):
     return f"{'-' if x < 0 else '+'}${abs(x)/1e6:.1f}M" if abs(x) >= 1e6 else f"{'-' if x < 0 else '+'}${abs(x)/1e3:.0f}k"
 
 
+def uoa_rows(r):
+    return json.loads(r.uoa) if isinstance(r.uoa, str) and r.uoa else []
+
+
+def uoa_text(r):
+    rows = uoa_rows(r)
+    return " | ".join(f"{h['contract']} {h['volume']:,} vs OI {h['oi']:,} {h['side']} {money(h['premium'])[1:]}"
+                      for h in rows[:2]) or "—"
+
+
+def uoa_section(df, th, td):
+    u = CFG["uoa"]
+    rows = [dict(h, ticker=r.ticker, sector=r.sector, spot=r.spot)
+            for _, r in df.iterrows() for h in uoa_rows(r)]
+    rows.sort(key=lambda h: -h["premium"])
+    for h in rows:
+        h["ratio"] = "new" if h["oi"] == 0 else f"{h['volume'] / h['oi']:.1f}×"
+        m = h["otm"]
+        h["mny"] = "ATM" if abs(m) < 0.01 else f"{abs(m) * 100:.0f}% {'OTM' if m > 0 else 'ITM'}"
+    if not rows:
+        return "<p style='font-size:13px'>No contract met the unusual-activity rules today.</p>"
+    lean = {"Bull": "🟢 Bull", "Bear": "🔴 Bear", "?": "—"}
+    body = "".join(
+        f"<tr><td {td}><b>{h['ticker']}</b></td><td {td}>{h['sector']}</td><td {td}>{h['contract']}</td>"
+        f"<td {td}>{h['volume']:,}</td><td {td}>{h['oi']:,}</td>"
+        f"<td {td}>{h['ratio']}</td>"
+        f"<td {td}>{money(h['premium'])[1:]}</td><td {td}>{h['side']}</td><td {td}>{lean[h['lean']]}</td>"
+        f"<td {td}>{h['mny']}</td></tr>"
+        for h in rows[:u["max_rows"]])
+    head = "".join(f"<th {th}>{c}</th>" for c in
+                   ("Ticker", "Sector", "Contract", "Vol today", "OI", "Vol/OI", "Premium", "Side", "Lean", "Strike vs price"))
+    return (f"<p style='font-size:12px;color:#777'>Contracts trading at least {u['min_volume']:,} today, above "
+            f"{u['min_vol_oi']:g}× open interest (new positions, not closing trades), with at least "
+            f"{money(u['min_premium'])[1:]} premium. Covers every scanned name, not only the lists above. "
+            f"Side is estimated from the last print vs mid. A bought call or sold put leans Bull. "
+            f"Sold options are often one leg of a spread.</p>"
+            f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
+
+
 def deep_dive(r, td):
     num = lambda x, f="{:.2f}": "—" if x is None or pd.isna(x) else f.format(x)
     rr = "—" if pd.isna(r.rr) else f"{r.rr*100:+.0f} pts ({'calls' if r.rr > 0 else 'puts'} richer)"
@@ -502,6 +570,7 @@ def deep_dive(r, td):
 <tr><td {td}>Open interest</td><td {td}>{int(r.opt_oi):,} · put/call {num(r.pc_oi)}</td></tr>
 <tr><td {td}>Skew (1σ risk reversal)</td><td {td}>{rr}</td></tr>
 <tr><td {td}>Net premium (est.)</td><td {td}>{net}</td></tr>
+<tr><td {td}>Unusual activity</td><td {td}>{uoa_text(r)}</td></tr>
 <tr><td {td}>Busiest contracts</td><td {td}>{html.escape(r.top_strikes) or "—"}</td></tr>
 </table></div>"""
 
@@ -596,6 +665,8 @@ def build_html(df, today, errors, card):
 <h3>🔍 Call/put deep dive: next to explode</h3>
 <p style="font-size:12px;color:#777">Bias (−100 to +100) blends today's put/call volume (30%), put/call open interest (20%), 1σ skew (20%) and estimated net premium (30%). Bull at +{CFG['bias_threshold']} or more, Bear at −{CFG['bias_threshold']} or less, otherwise Base. Net premium counts a trade at or above mid as bought, which is an estimate: Yahoo shows only each contract's last print. Bear/Base/Bull prices come from the options' own implied distribution, using put IV for the downside and call IV for the upside. There is about a 16% chance of finishing below Bear, 50% inside Base, and 16% above Bull.</p>
 {"".join(deep_dive(r, td) for _, r in top_ex.iterrows())}
+<h3>⚡ Unusual options activity</h3>
+{uoa_section(df, th, td)}
 <h3>🔥 Highest implied volatility</h3>
 {table(top_iv, iv_cols)}
 <h3>🔍 Call/put deep dive: highest IV</h3>
