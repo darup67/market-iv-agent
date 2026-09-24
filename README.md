@@ -57,8 +57,15 @@ the picks from 5 sessions ago against their implied move, to keep the score hone
 
 ## Email
 
-Weekdays at 16:30 ET (launchd `com.dhruv.healthiv`, StartCalendarInterval) to
-darup67@gmail.com. It uses the Gmail app password in the Keychain
+Two weekday runs to darup67@gmail.com (launchd, StartCalendarInterval):
+
+- **09:45 ET** `com.dhruv.healthiv.open`: subject tagged `[9:45 open screen]`.
+  Live, settled quotes; this is the one to use for the spread screen.
+- **16:30 ET** `com.dhruv.healthiv`: end-of-day run. Option quotes after the
+  4:00 close widen, which can knock names out of the spread liquidity gate.
+
+Both write the day's history (the later run replaces the earlier one's rows);
+`data/spreads.csv` keeps each run's tickets separately (`run` column). It uses the Gmail app password in the Keychain
 (`-a darup67@gmail.com -s flip-notifier-gmail`), the same one as flip-notifier
 and zillow-agent.
 
@@ -95,8 +102,9 @@ A full scan takes about 5 minutes (3 workers, backs off on Yahoo 429s).
 
 ```bash
 uv venv -p 3.11 .venv && uv pip install -p .venv/bin/python -r requirements.txt
-cp com.dhruv.healthiv.plist ~/Library/LaunchAgents/
+cp com.dhruv.healthiv.plist com.dhruv.healthiv.open.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.open.plist
 ```
 
 ## Files
