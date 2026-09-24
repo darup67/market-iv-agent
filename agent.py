@@ -845,11 +845,15 @@ def main():
 
     if tickets:
         tk = pd.DataFrame([{k: v for k, v in t.items() if not k.startswith("_")} for t in tickets])
+        run = a.tag or "close"
+        tk.insert(0, "run", run)
         tk.insert(0, "date", today.isoformat())
         path = DATA / "spreads.csv"
         if path.exists():
             old = pd.read_csv(path)
-            tk = pd.concat([old[old["date"] != today.isoformat()], tk])
+            if "run" not in old:
+                old.insert(1, "run", "close")
+            tk = pd.concat([old[(old["date"] != today.isoformat()) | (old["run"] != run)], tk])
         tk.to_csv(path, index=False)
 
     if CFG["email_enabled"]:
