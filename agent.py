@@ -762,6 +762,7 @@ def main():
     ap.add_argument("--dry", action="store_true", help="no email, no history write; writes preview.html")
     ap.add_argument("--tickers", help="comma-separated subset")
     ap.add_argument("--test-email", action="store_true")
+    ap.add_argument("--tag", help="prefix for the email subject, e.g. '9:45 open screen'")
     a = ap.parse_args()
     DATA.mkdir(exist_ok=True)
 
@@ -809,6 +810,8 @@ def main():
     subject = (f"🧬 Health care IV · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
                f"Watch {top_ex.ticker}" + (f" {top_ex.bias_label}" if isinstance(top_ex.bias_label, str) else "") + (f" (±{top_ex.implied_move*100:.0f}% by {top_ex.front_exp[5:]})" if pd.notna(top_ex.implied_move) else ""))
     tickets = spreads.plan(email_pool(df), CFG, today, atm_for_expiry)
+    if a.tag:
+        subject = f"[{a.tag}] {subject}"
     body = build_html(df, today, errors, card, tickets)
 
     if a.dry:
