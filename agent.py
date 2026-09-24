@@ -45,6 +45,7 @@ import pandas as pd
 import yfinance as yf
 
 import catalysts
+import spreads
 
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
@@ -553,6 +554,50 @@ def uoa_section(df, th, td):
             f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
 
 
+def spreads_section(tickets, th, td):
+    c = CFG["spreads"]
+    if not tickets:
+        return "<p style='font-size:13px'>No Bull-labelled names in today's pool, so no spreads.</p>"
+    act = [t for t in tickets if t.get("act")]
+    head = "".join(f"<th {th}>{h}</th>" for h in (
+        "", "Ticker", "Bias", "Expiry", "Buy (bid/ask, OI)", "Sell (bid/ask, OI)", "Limit", "Qty", "Cost = max loss",
+        "Max gain", "R:R", "Breakeven", "P(profit)", "P(max)", "Catalyst"))
+    body = ""
+    for t in tickets:
+        if t.get("limit") is None:
+            body += (f"<tr><td {td}>👀</td><td {td}><b>{t['ticker']}</b></td><td {td}>{t['bias']:+.0f}</td>"
+                     f"<td {td} colspan=12>watch only: {html.escape(t['fail'])}</td></tr>")
+            continue
+        lb, la, lo = t["long_q"]
+        hb, ha, ho = t["short_q"]
+        mark = "✅ ACT" if t["act"] else "👀"
+        why = "" if t["act"] else f"<br><span style='color:#999;font-size:11px'>watch only: {html.escape(t['fail'] or 'outranked')}</span>"
+        style = td if t["act"] else td.replace('font-size:13px', 'font-size:13px;color:#777')
+        body += (f"<tr><td {style}><b>{mark}</b></td><td {style}><b>{t['ticker']}</b> ${t['spot']:,.2f}{why}</td>"
+                 f"<td {style}>{t['bias']:+.0f}</td><td {style}>{t['exp'][5:]}</td>"
+                 f"<td {style}>${t['long']:g}C ({lb:.2f}/{la:.2f}, {lo:,})</td>"
+                 f"<td {style}>${t['short']:g}C ({hb:.2f}/{ha:.2f}, {ho:,})</td>"
+                 f"<td {style}>${t['limit']:.2f}</td><td {style}>{t['qty']}</td><td {style}>${t['cost']:,.0f}</td>"
+                 f"<td {style}>${t['max_gain']:,.0f}</td><td {style}>{t['rr']:.1f}</td>"
+                 f"<td {style}>${t['be']:,.2f} ({t['be'] / t['spot'] - 1:+.0%})</td>"
+                 f"<td {style}>{t['p_profit']:.0%}</td><td {style}>{t['p_max']:.0%}</td>"
+                 f"<td {style}>{html.escape(t.get('catalysts') or '—')}</td></tr>")
+    total = sum(t["cost"] for t in act)
+    summary = (f"<b>Act on {len(act)} of {len(tickets)}:</b> {', '.join(t['ticker'] for t in act)} · "
+               f"${total:,.0f} of ${c['budget_total']:,.0f}" if act else
+               "<b>None of today's candidates passed the rule.</b> No spread to act on.")
+    return (f"<p style='font-size:13px'>{summary}</p>"
+            f"<p style='font-size:12px;color:#777'>Top {c['candidates']} Bull names by bias. Each spread buys the call "
+            f"nearest the price and sells the call nearest the 1σ bull level, on the first expiry "
+            f"{c['min_dte']}–{c['max_dte']} days out, at a limit of mid rounded up to $0.05. <b>Act-on rule</b> (fixed, not tuned on "
+            f"results): both legs bid, each leg's spread under {c['max_leg_spread']:.0%} of mid or $0.10 wide, open interest at least "
+            f"the order size, still Bull; the top {c['act_on']} by bias (ties: higher P(profit)) split "
+            f"${c['budget_total']:,.0f}. P(profit) and P(max) are the options market's own odds, so each spread's expected "
+            f"payoff is roughly its cost. Most expire worthless. Delayed quotes: re-check prices before entering. "
+            f"This is a screen, not advice. Orders are entered by hand.</p>"
+            f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
+
+
 def deep_dive(r, td):
     num = lambda x, f="{:.2f}": "—" if x is None or pd.isna(x) else f.format(x)
     rr = "—" if pd.isna(r.rr) else f"{r.rr*100:+.0f} pts ({'calls' if r.rr > 0 else 'puts'} richer)"
@@ -574,7 +619,7 @@ def deep_dive(r, td):
 </table></div>"""
 
 
-def build_html(df, today, errors, card):
+def build_html(df, today, errors, card, tickets=()):
     pool = email_pool(df)
     top_iv = pool.sort_values("iv30", ascending=False).head(CFG["top_iv"])
     top_ex = pool.sort_values("score", ascending=False).head(CFG["top_explode"])
@@ -662,6 +707,8 @@ def build_html(df, today, errors, card):
 <h3>🚀 Next to explode</h3>
 <p style="font-size:12px;color:#777">Ranks names whose options price a large move soon. It is not a forecast of direction: a high score means the market expects a big move, and the premium already reflects that.</p>
 {table(top_ex, ex_cols)}
+<h3>🎯 Bull call spreads</h3>
+{spreads_section(tickets, th, td)}
 <h3>🔍 Call/put deep dive: next to explode</h3>
 <p style="font-size:12px;color:#777">Bias (−100 to +100) blends today's put/call volume (30%), put/call open interest (20%), 1σ skew (20%) and estimated net premium (30%). Bull at +{CFG['bias_threshold']} or more, Bear at −{CFG['bias_threshold']} or less, otherwise Base. Net premium counts a trade at or above mid as bought, which is an estimate: Yahoo shows only each contract's last print. Bear/Base/Bull prices come from the options' own implied distribution, using put IV for the downside and call IV for the upside. There is about a 16% chance of finishing below Bear, 50% inside Base, and 16% above Bull.</p>
 {"".join(deep_dive(r, td) for _, r in top_ex.iterrows())}
@@ -761,7 +808,8 @@ def main():
     top_ex = pool.sort_values("score", ascending=False).iloc[0]
     subject = (f"🧬 Health care IV · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
                f"Watch {top_ex.ticker}" + (f" {top_ex.bias_label}" if isinstance(top_ex.bias_label, str) else "") + (f" (±{top_ex.implied_move*100:.0f}% by {top_ex.front_exp[5:]})" if pd.notna(top_ex.implied_move) else ""))
-    body = build_html(df, today, errors, card)
+    tickets = spreads.plan(email_pool(df), CFG, today, atm_for_expiry)
+    body = build_html(df, today, errors, card, tickets)
 
     if a.dry:
         (ROOT / "preview.html").write_text(body)
@@ -789,6 +837,15 @@ def main():
         oldp = pd.read_csv(PICKS)
         picks = pd.concat([oldp[oldp["date"] != today.isoformat()], picks])
     picks.to_csv(PICKS, index=False)
+
+    if tickets:
+        tk = pd.DataFrame([{k: v for k, v in t.items() if not k.startswith("_")} for t in tickets])
+        tk.insert(0, "date", today.isoformat())
+        path = DATA / "spreads.csv"
+        if path.exists():
+            old = pd.read_csv(path)
+            tk = pd.concat([old[old["date"] != today.isoformat()], tk])
+        tk.to_csv(path, index=False)
 
     if CFG["email_enabled"]:
         ok = send_email(subject, body)

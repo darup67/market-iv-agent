@@ -65,6 +65,13 @@ and zillow-agent.
 - Subject: top IV name and the top "watch" name.
 - Sector summary: median IV30 and the highest name per sector.
 - 🚀 Next to explode: top 10, with the bias and the reasons behind each score.
+- 🎯 Bull call spreads (`spreads.py`, config `spreads`): top 5 Bull names by bias.
+  Buy the call nearest the price and sell the call nearest the 1σ bull level, on the
+  first expiry 21–45 days out, at a limit of mid rounded up to $0.05. Fixed act-on
+  rule: both legs bid, each leg under 50% of mid or $0.10 wide, OI ≥ order size,
+  still Bull. The top 2 by bias (ties: higher P(profit)) split $10k. The rest
+  are "watch only" with the reason. Tickets are saved to `data/spreads.csv`.
+  Orders are entered by hand, never placed by the agent.
 - 🔍 Deep dive card per explode pick: bear/base/bull prices, P/C ratios, skew,
   net premium and the busiest contracts.
 - ⚡ Unusual options activity: contracts with ≥300 volume today above open interest and ≥$50k premium, any scanned name (config `uoa`).
@@ -97,6 +104,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.plist
 | Path | What |
 |---|---|
 | `agent.py` | the whole agent |
+| `spreads.py` | bull call spread tickets + act-on rule |
 | `catalysts.py` | FDA / clinical-trial calendar scraper and matcher |
 | `catalysts_manual.json` | hand-added events for tickers the calendars miss |
 | `config.json` | universe ETFs, extra tickers, filters, score weights, email |

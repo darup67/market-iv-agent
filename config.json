@@ -95,5 +95,13 @@
     "vol_oi": 0.2,
     "iv_change_1d": 0.15,
     "implied_move": 0.15
+  },
+  "spreads": {
+    "candidates": 5,
+    "act_on": 2,
+    "budget_total": 10000,
+    "min_dte": 21,
+    "max_dte": 45,
+    "max_leg_spread": 0.5
   }
 }
