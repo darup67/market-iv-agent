@@ -65,7 +65,7 @@ and zillow-agent.
 - Subject: top IV name and the top "watch" name.
 - Sector summary: median IV30 and the highest name per sector.
 - 🚀 Next to explode: top 10, with the bias and the reasons behind each score.
-- 🎯 Bull call spreads (`spreads.py`, config `spreads`): top 5 Bull names by bias.
+- 🎯 Bull call spreads (`spreads.py`, config `spreads`): top 10 Bull names by bias (`candidates`).
   Buy the call nearest the price and sell the call nearest the 1σ bull level, on the
   first expiry 21–45 days out, at a limit of mid rounded up to $0.05. Fixed act-on
   rule: both legs bid, each leg under 50% of mid or $0.10 wide, OI ≥ order size,
