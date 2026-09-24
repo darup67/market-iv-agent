@@ -1,0 +1,81 @@
+# Health care IV agent
+
+A daily email that ranks US health care stocks (biotech, pharma, medical devices,
+health care services and large-cap health care) by **implied volatility**, and by
+how strongly their options price a **big move soon**.
+
+Read-only. It never trades. Email is the only channel: no banner and no sound.
+
+## What it does
+
+1. **Universe.** Every holding of the SPDR XBI (biotech), XPH (pharma), XHE
+   (medical devices), XHS (health care services) and XLV (large-cap health care)
+   ETFs, downloaded fresh each run, plus foreign and large-cap pharma listed in
+   `config.json`. About 380 names; roughly 270 have usable options.
+2. **Per ticker** (Yahoo Finance option chains, via `yfinance`):
+   - ATM IV per expiry: the median Black-Scholes IV over the 3 strikes nearest spot,
+     calls and puts, from bid/ask mids. Quotes with no bid, a spread wider than
+     `max_spread_pct`, or an IV above 500% are dropped, and at least 2 clean quotes
+     are required. Single ATM quotes are often stale.
+   - **IV30**: ATM IV interpolated to 30 days in total variance.
+   - **Term ratio**: front-expiry IV ÷ ~75-day IV. Above 1 means an event is priced
+     before the front expiry.
+   - **IV / HV20**: implied vs 20-day realized volatility.
+   - **Volume / OI**, and the call share of volume.
+   - **Implied move** to the front expiry (≤45 DTE only).
+   - Next earnings date.
+3. **Next-to-explode score** (0–100): weighted percentile rank across the universe
+   of term ratio (30%), IV/HV (20%), vol/OI (20%), 1-day IV change (15%) and implied
+   move (15%). A factor with no data yet, such as the 1-day change on day 1, is
+   dropped and the weights are renormalised.
+
+**What the score means:** the options market expects a large move soon, which
+usually means an FDA date, a trial readout or earnings. It does **not** predict
+direction, and the premium already prices the move. The email's scorecard checks
+the picks from 5 sessions ago against their implied move, to keep the score honest.
+
+## Email
+
+Weekdays at 16:30 ET (launchd `com.dhruv.healthiv`, StartCalendarInterval) to
+darup67@gmail.com. It uses the Gmail app password in the Keychain
+(`-a darup67@gmail.com -s flip-notifier-gmail`), the same one as flip-notifier
+and zillow-agent.
+
+- Subject: top IV name and the top "watch" name.
+- Sector summary: median IV30 and the highest name per sector.
+- 🚀 Next to explode: top 10, with the reasons behind each score.
+- 🔥 Highest IV: top 15.
+- Scorecard: picks from 5 sessions ago vs their implied move (starts in week 2).
+- IV rank appears after 20 days of saved history.
+
+## Commands
+
+```bash
+.venv/bin/python agent.py                         # scan, save history, email
+.venv/bin/python agent.py --dry                   # scan, write preview.html, no email or history
+.venv/bin/python agent.py --dry --tickers MRNA,VRTX
+.venv/bin/python agent.py --test-email
+```
+
+A full scan takes about 5 minutes (3 workers, backs off on Yahoo 429s).
+
+## Setup from scratch
+
+```bash
+uv venv -p 3.11 .venv && uv pip install -p .venv/bin/python -r requirements.txt
+cp com.dhruv.healthiv.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.plist
+```
+
+## Files
+
+| Path | What |
+|---|---|
+| `agent.py` | the whole agent |
+| `config.json` | universe ETFs, extra tickers, filters, score weights, email |
+| `data/history.csv` | daily IV30 etc. per ticker (drives IV rank and 1d change) |
+| `data/picks.csv` | daily top picks (drives the scorecard) |
+| `data/snapshot-YYYY-MM-DD.csv` | full daily scan |
+| `agent.out.log` / `agent.err.log` | launchd logs |
+
+`data/` is gitignored. Losing it resets IV rank and the scorecard, nothing else.

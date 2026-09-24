@@ -1,0 +1,89 @@
+{
+  "email_to": "darup67@gmail.com",
+  "email_enabled": true,
+  "keychain_account": "darup67@gmail.com",
+  "keychain_service": "flip-notifier-gmail",
+  "universe_etfs": [
+    {
+      "etf": "XBI",
+      "sector": "Biotech"
+    },
+    {
+      "etf": "XPH",
+      "sector": "Pharma"
+    },
+    {
+      "etf": "XHE",
+      "sector": "Med devices"
+    },
+    {
+      "etf": "XHS",
+      "sector": "HC services"
+    },
+    {
+      "etf": "XLV",
+      "sector": "Health care"
+    }
+  ],
+  "universe_url_template": "https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-{etf}.xlsx",
+  "extra_sector": "Pharma",
+  "extra_tickers": [
+    "XBI",
+    "IBB",
+    "LLY",
+    "JNJ",
+    "PFE",
+    "MRK",
+    "ABBV",
+    "BMY",
+    "AMGN",
+    "GILD",
+    "REGN",
+    "VRTX",
+    "BIIB",
+    "MRNA",
+    "BNTX",
+    "NVO",
+    "AZN",
+    "SNY",
+    "GSK",
+    "NVS",
+    "TEVA",
+    "VTRS",
+    "ZTS",
+    "ELAN",
+    "JAZZ",
+    "BHC",
+    "HLN",
+    "OGN",
+    "PRGO",
+    "ALNY",
+    "ARGX",
+    "BGNE",
+    "INCY",
+    "NBIX",
+    "UTHR",
+    "XPH",
+    "XHE",
+    "XHS",
+    "XLV",
+    "IHI"
+  ],
+  "min_price": 3.0,
+  "min_open_interest": 500,
+  "max_spread_pct": 0.8,
+  "min_dte": 3,
+  "max_dte": 120,
+  "workers": 3,
+  "top_iv": 15,
+  "top_explode": 10,
+  "earnings_window_days": 14,
+  "scorecard_lag_sessions": 5,
+  "explode_weights": {
+    "term_ratio": 0.3,
+    "iv_hv": 0.2,
+    "vol_oi": 0.2,
+    "iv_change_1d": 0.15,
+    "implied_move": 0.15
+  }
+}
