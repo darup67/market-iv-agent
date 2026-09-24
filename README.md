@@ -29,6 +29,21 @@ Read-only. It never trades. Email is the only channel: no banner and no sound.
    move (15%). A factor with no data yet, such as the 1-day change on day 1, is
    dropped and the weights are renormalised.
 
+4. **Call/put deep dive** on the same near-term chains (≤45 DTE), using only
+   today's volume (Yahoo keeps a contract's old volume until it trades again, so
+   stale rows are zeroed):
+   - put/call ratio of volume and of open interest
+   - 1σ risk reversal: OTM call IV − OTM put IV
+   - estimated net premium: a print at or above mid counts as bought. Bullish =
+     calls bought + puts sold. Only each contract's last print is visible.
+   - **Bias** −100..+100 = 30% volume P/C, 20% OI P/C, 20% skew, 30% net premium.
+     **Bull** ≥ +25, **Bear** ≤ −25, otherwise **Base** (`bias_threshold`).
+   - **Bear / Base / Bull prices** from the front expiry's implied distribution,
+     with put IV on the downside and call IV on the upside: about 16% odds below
+     Bear, 50% inside the Base range and 16% above Bull.
+5. **Volume filter:** only names that traded at least `min_email_volume` (500)
+   option contracts today appear in the email lists.
+
 **What the score means:** the options market expects a large move soon, which
 usually means an FDA date, a trial readout or earnings. It does **not** predict
 direction, and the premium already prices the move. The email's scorecard checks
@@ -43,9 +58,12 @@ and zillow-agent.
 
 - Subject: top IV name and the top "watch" name.
 - Sector summary: median IV30 and the highest name per sector.
-- 🚀 Next to explode: top 10, with the reasons behind each score.
+- 🚀 Next to explode: top 10, with the bias and the reasons behind each score.
+- 🔍 Deep dive card per explode pick: bear/base/bull prices, P/C ratios, skew,
+  net premium and the busiest contracts.
 - 🔥 Highest IV: top 15.
-- Scorecard: picks from 5 sessions ago vs their implied move (starts in week 2).
+- Scorecard: picks from 5 sessions ago vs their implied move, and whether a
+  Bull/Bear bias called the direction (starts in week 2).
 - IV rank appears after 20 days of saved history.
 
 ## Commands
