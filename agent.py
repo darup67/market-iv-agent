@@ -810,6 +810,8 @@ def main():
     subject = (f"🧬 Health care IV · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
                f"Watch {top_ex.ticker}" + (f" {top_ex.bias_label}" if isinstance(top_ex.bias_label, str) else "") + (f" (±{top_ex.implied_move*100:.0f}% by {top_ex.front_exp[5:]})" if pd.notna(top_ex.implied_move) else ""))
     tickets = spreads.plan(email_pool(df), CFG, today, atm_for_expiry)
+    act = [t["ticker"] for t in tickets if t.get("act")]
+    subject += f" · ACT {'+'.join(act)}" if act else " · no spread passes"
     if a.tag:
         subject = f"[{a.tag}] {subject}"
     body = build_html(df, today, errors, card, tickets)
