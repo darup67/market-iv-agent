@@ -79,3 +79,12 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.plist
 | `agent.out.log` / `agent.err.log` | launchd logs |
 
 `data/` is gitignored. Losing it resets IV rank and the scorecard, nothing else.
+
+## Planned
+
+- **Jev for event-driven IV** (waiting on the API key). Jev judges text, so it
+  would read catalyst news for the "next to explode" names and identify the
+  event and its date: FDA/PDUFA, trial readout, earnings or M&A. It would go
+  through the shared `~/jev-client`. The IV math and the score stay in code.
+  It starts shadow-only: answers are logged, and the email is unchanged until
+  the logs have been reviewed.
