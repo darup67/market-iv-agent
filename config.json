@@ -97,7 +97,7 @@
     "implied_move": 0.15
   },
   "spreads": {
-    "candidates": 5,
+    "candidates": 10,
     "act_on": 2,
     "budget_total": 10000,
     "min_dte": 21,
