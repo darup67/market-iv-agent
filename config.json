@@ -80,6 +80,12 @@
   "top_explode": 10,
   "min_email_volume": 500,
   "bias_threshold": 25,
+  "uoa": {
+    "min_volume": 300,
+    "min_vol_oi": 1.0,
+    "min_premium": 50000,
+    "max_rows": 15
+  },
   "earnings_window_days": 14,
   "scorecard_lag_sessions": 5,
   "explode_weights": {
