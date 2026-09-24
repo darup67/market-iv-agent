@@ -44,6 +44,8 @@ import logging
 import pandas as pd
 import yfinance as yf
 
+import catalysts
+
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 ROOT = Path(__file__).resolve().parent
@@ -461,10 +463,6 @@ def reasons(r, today):
         out.append(f"options vol {r.vol_oi:.1f}× OI{side}")
     if pd.notna(r.get("iv_change_1d")) and r.iv_change_1d >= 0.05:
         out.append(f"IV +{r.iv_change_1d*100:.0f} pts today")
-    if isinstance(r.earnings, str):
-        days = (dt.date.fromisoformat(r.earnings) - today).days
-        if days <= CFG["earnings_window_days"]:
-            out.append(f"earnings {r.earnings[5:]} ({days}d)")
     return "; ".join(out) or "—"
 
 
@@ -566,6 +564,7 @@ def deep_dive(r, td):
 <div style="font-size:15px"><b>{r.ticker}</b> ${r.spot:,.2f} · {bias_badge(r)} <span style="color:#777;font-size:12px">· {r.sector} · score {r.score:.0f}</span></div>
 <div style="font-size:13px;margin-top:6px">{cases} <span style="color:#777">by {r.case_exp[5:]}</span></div>
 <table style="border-collapse:collapse;margin-top:6px">
+<tr><td {td}>Catalysts</td><td {td}>{html.escape(r.catalysts) or "none on the FDA/trial calendars or earnings in the next 120 days"}</td></tr>
 <tr><td {td}>Options volume today</td><td {td}>{int(r.opt_volume):,} ({pct(r.call_share)} calls) · put/call {num(r.pc_vol)}</td></tr>
 <tr><td {td}>Open interest</td><td {td}>{int(r.opt_oi):,} · put/call {num(r.pc_oi)}</td></tr>
 <tr><td {td}>Skew (1σ risk reversal)</td><td {td}>{rr}</td></tr>
@@ -624,6 +623,7 @@ def build_html(df, today, errors, card):
         ("Bias", bias_badge),
         ("Opt vol", lambda r: f"{int(r.opt_volume):,}"),
         ("P/C", lambda r: "—" if pd.isna(r.pc_vol) else f"{r.pc_vol:.2f}"),
+        ("Catalyst", lambda r: html.escape(r.catalysts) or "none found"),
         ("Why", lambda r: html.escape(r.why)),
     ]
     card_html = ""
@@ -673,7 +673,7 @@ def build_html(df, today, errors, card):
 {iv_cards}
 {hist_note}
 {card_html}
-<p style="font-size:11px;color:#999;margin-top:24px">Data: Yahoo Finance option chains (end of day), SPDR ETF holdings. ATM IV is computed from bid/ask mids.
+<p style="font-size:11px;color:#999;margin-top:24px">Data: Yahoo Finance option chains (end of day), SPDR ETF holdings, RTTNews FDA and clinical-trial calendars (pending events only; windows like "Q4 2026" are company guidance, not fixed dates). ATM IV is computed from bid/ask mids.
 {len(errors)} tickers were skipped (no options, low open interest, or price under ${CFG['min_price']:.0f}). Read-only agent, not investment advice.</p>
 </div>"""
 
@@ -750,6 +750,10 @@ def main():
     df = enrich_with_history(df, today)
     df = explode_score(df)
     df["why"] = df.apply(lambda r: reasons(r, today), axis=1)
+    cal = catalysts.load(log=log)
+    df["catalysts"] = df.apply(lambda r: " · ".join(
+        catalysts.describe(e, r.front_exp)
+        for e in catalysts.upcoming(cal, r.ticker, today, r.earnings)[:CFG["max_catalysts"]]), axis=1)
     card = scorecard(df, today)
 
     pool = email_pool(df) if len(email_pool(df)) else df
