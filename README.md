@@ -61,7 +61,7 @@ and zillow-agent.
 - 🚀 Next to explode: top 10, with the bias and the reasons behind each score.
 - 🔍 Deep dive card per explode pick: bear/base/bull prices, P/C ratios, skew,
   net premium and the busiest contracts.
-- 🔥 Highest IV: top 15.
+- 🔥 Highest IV: top 15, plus deep-dive cards for names not already carded above.
 - Scorecard: picks from 5 sessions ago vs their implied move, and whether a
   Bull/Bear bias called the direction (starts in week 2).
 - IV rank appears after 20 days of saved history.

@@ -576,6 +576,13 @@ def build_html(df, today, errors, card):
                      f"<table style='border-collapse:collapse'><tr><th {th}>Ticker</th><th {th}>Bias</th>"
                      f"<th {th}>Implied</th><th {th}>Actual</th><th {th}>Beat move</th><th {th}>Direction</th></tr>"
                      f"{rows}</table>")
+    # names already carded in the explode section are pointed to, not repeated
+    shown = set(top_ex.ticker)
+    dup = [t for t in top_iv.ticker if t in shown]
+    iv_cards = "".join(deep_dive(r, td) for _, r in top_iv.iterrows() if r.ticker not in shown)
+    if dup:
+        iv_cards += (f'<p style="font-size:12px;color:#777">Also in the top IV list, with cards above: '
+                     f'{", ".join(dup)}.</p>')
     hist_note = ("" if has_rank else
                  "<p style='font-size:12px;color:#777'>IV rank appears after 20 days of saved history. "
                  "The 1-day IV change starts on day 2.</p>")
@@ -591,6 +598,8 @@ def build_html(df, today, errors, card):
 {"".join(deep_dive(r, td) for _, r in top_ex.iterrows())}
 <h3>🔥 Highest implied volatility</h3>
 {table(top_iv, iv_cols)}
+<h3>🔍 Call/put deep dive: highest IV</h3>
+{iv_cards}
 {hist_note}
 {card_html}
 <p style="font-size:11px;color:#999;margin-top:24px">Data: Yahoo Finance option chains (end of day), SPDR ETF holdings. ATM IV is computed from bid/ask mids.
