@@ -626,13 +626,20 @@ def spreads_section(tickets, th, td):
                "<b>None of today's candidates passed the rule.</b> No spread to act on.")
     return (f"<p style='font-size:13px'>{summary}</p>"
             f"<p style='font-size:12px;color:#777'>Top {c['candidates']} Bull names by bias with an explode score of "
-            f"{c.get('min_explode', 0)} or more. Each spread buys the call "
-            f"nearest the price and sells the call nearest the 1σ bull level, on the first expiry "
-            f"{c['min_dte']}–{c['max_dte']} days out, at a limit of mid rounded up to $0.05. <b>Act-on rule</b> (fixed, not tuned on "
+            f"{c.get('min_explode', 0)} or more. " + (
+            f"Strikes are searched on the first expiry {c['min_dte']}–{c['max_dte']} days out: only pairs where the "
+            f"market-implied odds of profit are at least {c.get('min_p_profit', 0):.0%} and the max gain is at least "
+            f"{c.get('min_reward_risk', 0)}× the risk qualify (so the breakeven sits at or below today's price), and the "
+            f"best reward/risk wins, at a limit of mid rounded up to $0.05."
+            if c.get("construction", "odds") == "odds" else
+            f"Each spread buys the call nearest the price and sells the call nearest the 1σ bull level, on the first "
+            f"expiry {c['min_dte']}–{c['max_dte']} days out, at a limit of mid rounded up to $0.05.") + f" <b>Act-on rule</b> (fixed, not tuned on "
             f"results): both legs bid, each leg's spread under {c['max_leg_spread']:.0%} of mid or $0.10 wide, open interest at least "
             f"the order size, still Bull; up to {c['act_on']} by bias (ties: higher P(profit)), "
             f"${c['budget_total'] / c['act_on']:,.0f} each. P(profit) and P(max) are the options market's own odds, so each spread's expected "
-            f"payoff is roughly its cost. Most expire worthless. Delayed quotes: re-check prices before entering. "
+            f"payoff is roughly its cost. " + ("Each is priced to finish with some profit at least half the time, "
+            "but the loss when wrong (the whole debit) is bigger than the gain when right. "
+            if c.get("construction", "odds") == "odds" else "Most expire worthless. ") + f"Delayed quotes: re-check prices before entering. "
             f"This is a screen, not advice. Orders are entered by hand.</p>"
             f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
 
