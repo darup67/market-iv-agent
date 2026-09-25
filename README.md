@@ -1,3 +1,40 @@
+# market-iv-agent
+
+Read-only options-IV scanner for the whole US stock market: **health care** (the
+default run) plus **every S&P sector** by profile, covering the S&P 500, the
+Nasdaq-100 and the Dow 30 (~517 names) and the broader health-care universe.
+Renamed from `biotech-iv-agent` on 2026-09-24 (GitHub redirects the old URL).
+It sends no email itself: `~/market-lab/event-desk` sends one email per sector
+from its handoffs.
+
+## Sector profiles
+
+`profiles/<sector>.json` overrides the universe, title and data folder. The 10
+sectors are technology, communication, consumer-discretionary, consumer-staples,
+financials, industrials, energy, materials, utilities and real-estate. Each profile
+scans its SPDR sector ETF's live holdings (which together make up exactly the
+S&P 500), plus the Nasdaq-100 and Dow names outside the S&P 500 that fall in that
+sector (ASML, ARM, SHOP, MELI, PDD, MSTR, NBIS and others). Health care stays the
+default run, since its XBI/XPH/XHE/XHS/XLV universe is broader.
+
+```bash
+.venv/bin/python agent.py --profile technology --dry   # one sector, preview only
+./run-sectors.sh                                       # all sectors, sequentially
+.venv/bin/python profiles/build_profiles.py            # regenerate after index changes
+```
+
+Each sector keeps its own `data/sectors/<key>/`: snapshot, history (IV rank after
+20 days), scorecard, spreads and handoff. The spread rule is shared: Bull bias,
+explode ≥ 60, liquid legs, 2–5 at $2,000 each, with $10k per sector.
+
+| launchd | when | does |
+|---|---|---|
+| `com.dhruv.healthiv.open` | weekdays 09:45 | health care open screen |
+| `com.dhruv.sectoriv.open` | weekdays 09:53 | `run-sectors.sh`, ~3 min for all 10 |
+| `com.dhruv.healthiv` | weekdays 16:30 | health care close run (data only) |
+
+---
+
 # Health care IV agent
 
 A daily email that ranks US health care stocks (biotech, pharma, medical devices,

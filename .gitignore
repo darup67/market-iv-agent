@@ -4,3 +4,4 @@ data/
 preview.html
 *.log
 .DS_Store
+preview-*.html
