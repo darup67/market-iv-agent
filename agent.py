@@ -795,6 +795,16 @@ def send_email(subject, body_html):
     return False
 
 
+def trading_day(d):
+    """Weekday and not an NYSE holiday. The holiday list is shared with event-desk and
+    the watchdog (~/market-lab/ops/nyse_holidays.json); if unreadable, weekdays count."""
+    try:
+        closed = set(json.loads(Path("~/market-lab/ops/nyse_holidays.json").expanduser().read_text())["closed"])
+    except Exception:
+        closed = set()
+    return d.weekday() < 5 and d.isoformat() not in closed
+
+
 # ---------------------------------------------------------------- handoff
 def handoff(today, run, subject, body, tickets):
     """Consolidated mode: no email from here. ~/market-lab/event-desk sends the one
@@ -837,8 +847,8 @@ def main():
         sys.exit(0 if ok else 1)
 
     today = dt.date.today()
-    if today.weekday() >= 5 and not a.dry and not a.tickers:
-        log("weekend, skipping")
+    if not trading_day(today) and not a.dry and not a.tickers:
+        log("market closed (weekend or NYSE holiday), skipping")
         return
     universe = load_universe()
     if a.tickers:
