@@ -11,11 +11,11 @@
     <array>
         <string>/bin/sh</string>
         <string>-c</string>
-        <string>export FLIP_GMAIL_APP_PASSWORD=$(security find-generic-password -a darup67@gmail.com -s flip-notifier-gmail -w 2>/dev/null); exec /usr/bin/caffeinate -i /Users/dhruvpatel/biotech-iv-agent/.venv/bin/python /Users/dhruvpatel/biotech-iv-agent/agent.py --tag "9:45 open screen"</string>
+        <string>export FLIP_GMAIL_APP_PASSWORD=$(security find-generic-password -a darup67@gmail.com -s flip-notifier-gmail -w 2>/dev/null); exec /usr/bin/caffeinate -i /Users/dhruvpatel/market-iv-agent/.venv/bin/python /Users/dhruvpatel/market-iv-agent/agent.py --tag "9:45 open screen"</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent</string>
+    <string>/Users/dhruvpatel/market-iv-agent</string>
 
     <key>StartCalendarInterval</key>
     <array>
@@ -30,10 +30,10 @@
     <false/>
 
     <key>StandardOutPath</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent/open.out.log</string>
+    <string>/Users/dhruvpatel/market-iv-agent/open.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent/open.err.log</string>
+    <string>/Users/dhruvpatel/market-iv-agent/open.err.log</string>
 
     <key>ProcessType</key>
     <string>Background</string>

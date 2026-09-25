@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Health care implied-volatility agent (biotech, pharma, medical devices, services).
+"""Market implied-volatility agent: health care by default, any S&P sector by profile.
+
+Default run (no --profile): health care, as described below. With --profile
+<name>, profiles/<name>.json overrides the universe (e.g. XLK holdings plus the
+Nasdaq-100 tech names outside the S&P 500), the report title, and the data
+folder (data/sectors/<name>/), so each sector keeps its own history, IV rank,
+scorecard and handoff. Everything else is shared: the scan, explode score,
+bias, spread rule and report layout.
+
+Health care profile (the default):
 
 Scans every holding of the SPDR health-care ETFs (XBI biotech, XPH pharma, XHE
 medical devices, XHS health care services, XLV large-cap health care) plus a list
@@ -20,6 +29,7 @@ Usage:
   agent.py --dry        scan and write preview.html; no email, no history write
   agent.py --tickers MRNA,VRTX --dry   scan a subset (for testing)
   agent.py --test-email send a one-line test email
+  agent.py --profile technology --tag "open screen"   one S&P sector (see profiles/)
 """
 import argparse
 import datetime as dt
@@ -56,6 +66,19 @@ HISTORY = DATA / "history.csv"      # one row per ticker per day; drives IV rank
 PICKS = DATA / "picks.csv"          # explode picks, for the scorecard
 CFG = json.loads((ROOT / "config.json").read_text())
 ETFS = {e["etf"] for e in CFG["universe_etfs"]} | {"IBB", "IHI"}
+PROFILE = None
+
+
+def apply_profile(name):
+    """Switch this run to profiles/<name>.json: its keys override config.json, and data
+    goes to data/sectors/<name>/. Must run before anything reads DATA or CFG."""
+    global CFG, DATA, HISTORY, PICKS, ETFS, PROFILE
+    prof = json.loads((ROOT / "profiles" / f"{name}.json").read_text())
+    CFG = {**CFG, **{k: v for k, v in prof.items() if not k.startswith("_")}}
+    DATA = ROOT / "data" / "sectors" / name
+    HISTORY, PICKS = DATA / "history.csv", DATA / "picks.csv"
+    ETFS = {e["etf"] for e in CFG["universe_etfs"]}
+    PROFILE = name
 
 
 def log(*a):
@@ -75,8 +98,9 @@ def load_universe():
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             raw = urllib.request.urlopen(req, timeout=30).read()
             df = pd.read_excel(io.BytesIO(raw), header=4)
-            tickers = [str(t).strip() for t in df["Ticker"].dropna()
-                       if str(t).strip().isalpha() and str(t).strip().isupper()]
+            # BRK.B / BF.B are share classes; Yahoo spells them BRK-B / BF-B
+            tickers = [str(t).strip().replace(".", "-") for t in df["Ticker"].dropna()
+                       if re.fullmatch(r"[A-Z]+(\.[A-Z])?", str(t).strip())]
             cached.write_text("\n".join(tickers))
         except Exception as e:
             log(f"{etf} holdings download failed ({e}); using cache")
@@ -87,6 +111,16 @@ def load_universe():
     for t in CFG["extra_tickers"]:
         out.setdefault(t, "ETF" if t in ETFS else CFG["extra_sector"])
     return out
+
+
+def _int(x):
+    """int() that treats None and NaN as 0. Yahoo leaves openInterest blank (NaN) on
+    some rows, and `x or 0` keeps NaN (NaN is truthy), so int() raised and the whole
+    ticker was dropped: NVDA, CSCO, SMCI, ALAB on 2026-09-24."""
+    try:
+        return 0 if x is None or math.isnan(float(x)) else int(x)
+    except (TypeError, ValueError):
+        return 0
 
 
 # ---------------------------------------------------------------- Black-Scholes IV
@@ -200,7 +234,7 @@ def unusual_activity(points, spot):
     for p in points:
         for df, is_call in ((p["_calls"], True), (p["_puts"], False)):
             for _, r in df[df.vol_today >= u["min_volume"]].iterrows():
-                oi = int(r.get("openInterest") or 0)
+                oi = _int(r.get("openInterest"))
                 b, a, last = r.get("bid") or 0, r.get("ask") or 0, r.get("lastPrice") or 0
                 prem = r.vol_today * last * 100
                 if r.vol_today < u["min_vol_oi"] * max(oi, 1) or prem < u["min_premium"]:
@@ -211,7 +245,7 @@ def unusual_activity(points, spot):
                 else:
                     side, lean = "?", "?"
                 hits.append({"contract": f"{p['exp'][5:]} ${r.strike:g}{'C' if is_call else 'P'}",
-                             "dte": p["dte"], "volume": int(r.vol_today), "oi": oi,
+                             "dte": p["dte"], "volume": _int(r.vol_today), "oi": oi,
                              "premium": round(prem), "side": side, "lean": lean,
                              "otm": round((r.strike / spot - 1) * (1 if is_call else -1), 3)})
     hits.sort(key=lambda h: -h["premium"])
@@ -250,7 +284,7 @@ def flow_metrics(points, spot):
                     side = "?"
                 gross += prem
                 strikes.append((r.vol_today, f"{p['exp'][5:]} ${r.strike:g}{'C' if is_call else 'P'}",
-                                side, int(r.get("openInterest") or 0)))
+                                side, _int(r.get("openInterest"))))
     strikes.sort(reverse=True)
 
     # 1σ risk reversal on the ~30d-nearest near-term expiry
@@ -295,7 +329,7 @@ def flow_metrics(points, spot):
         "bull": round(spot * math.exp(fsd_up), 2),               # ~16% odds of closing above
         "uoa": json.dumps(uoa) if uoa else "",
         "uoa_n": len(uoa),
-        "top_strikes": " | ".join(f"{k} {int(v):,} {sd_}" + (f" (OI {oi:,})" if oi else "")
+        "top_strikes": " | ".join(f"{k} {_int(v):,} {sd_}" + (f" (OI {oi:,})" if oi else "")
                                   for v, k, sd_, oi in strikes[:3]),
     }
 
@@ -401,8 +435,8 @@ def _scan(sym, today):
         "implied_move": round(front["move"], 4) if front["dte"] <= 45 else None,
         "hv20": round(hv20, 4) if hv20 else None,
         "iv_hv": round(iv30 / hv20, 3) if hv20 else None,
-        "opt_volume": int(vol),
-        "opt_oi": int(oi),
+        "opt_volume": _int(vol),
+        "opt_oi": _int(oi),
         "vol_oi": round(vol / oi, 3) if oi else None,
         "call_share": round(cvol / vol, 3) if vol else None,
         "earnings": earnings,
@@ -703,8 +737,8 @@ def build_html(df, today, errors, card, tickets=()):
                  "<p style='font-size:12px;color:#777'>IV rank appears after 20 days of saved history. "
                  "The 1-day IV change starts on day 2.</p>")
     return f"""<div style="font-family:-apple-system,Helvetica,sans-serif;max-width:900px">
-<h2>Health care IV · {today:%a %b %d}</h2>
-<p style="font-size:13px;color:#555">{len(df)} optionable names scanned; {len(pool)} traded at least {CFG['min_email_volume']:,} option contracts today and are eligible for the lists below. Universe: biotech, pharma, medical devices, health care services and large-cap health care (SPDR XBI/XPH/XHE/XHS/XLV holdings).</p>
+<h2>{html.escape(CFG.get("title", "Health care IV"))} · {today:%a %b %d}</h2>
+<p style="font-size:13px;color:#555">{len(df)} optionable names scanned; {len(pool)} traded at least {CFG['min_email_volume']:,} option contracts today and are eligible for the lists below. Universe: {html.escape(CFG.get("universe_desc", "biotech, pharma, medical devices, health care services and large-cap health care (SPDR XBI/XPH/XHE/XHS/XLV holdings)"))}.</p>
 <table style="border-collapse:collapse"><tr><th {th}>Sector</th><th {th}>Names</th><th {th}>Median IV30</th><th {th}>Highest</th></tr>{sector_html}</table>
 <h3>🚀 Next to explode</h3>
 <p style="font-size:12px;color:#777">Ranks names whose options price a large move soon. It is not a forecast of direction: a high score means the market expects a big move, and the premium already reflects that.</p>
@@ -789,11 +823,14 @@ def main():
     ap.add_argument("--tickers", help="comma-separated subset")
     ap.add_argument("--test-email", action="store_true")
     ap.add_argument("--tag", help="prefix for the email subject, e.g. '9:45 open screen'")
+    ap.add_argument("--profile", help="sector profile in profiles/, e.g. technology")
     a = ap.parse_args()
-    DATA.mkdir(exist_ok=True)
+    if a.profile:
+        apply_profile(a.profile)
+    DATA.mkdir(parents=True, exist_ok=True)
 
     if a.test_email:
-        ok = send_email("🧬 Biotech IV agent: test email", "<p>Test from ~/biotech-iv-agent. Email delivery works.</p>")
+        ok = send_email("🧬 Biotech IV agent: test email", "<p>Test from ~/market-iv-agent. Email delivery works.</p>")
         sys.exit(0 if ok else 1)
 
     today = dt.date.today()
@@ -833,7 +870,7 @@ def main():
     pool = email_pool(df) if len(email_pool(df)) else df
     top_iv = pool.sort_values("iv30", ascending=False).iloc[0]
     top_ex = pool.sort_values("score", ascending=False).iloc[0]
-    subject = (f"🧬 Health care IV · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
+    subject = (f"{CFG.get('emoji', '🧬')} {CFG.get('title', 'Health care IV')} · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
                f"Watch {top_ex.ticker}" + (f" {top_ex.bias_label}" if isinstance(top_ex.bias_label, str) else "") + (f" (±{top_ex.implied_move*100:.0f}% by {top_ex.front_exp[5:]})" if pd.notna(top_ex.implied_move) else ""))
     tickets = spreads.plan(email_pool(df), CFG, today, atm_for_expiry)
     act = [t["ticker"] for t in tickets if t.get("act")]
@@ -843,7 +880,7 @@ def main():
     body = build_html(df, today, errors, card, tickets)
 
     if a.dry:
-        (ROOT / "preview.html").write_text(body)
+        (ROOT / (f"preview-{PROFILE}.html" if PROFILE else "preview.html")).write_text(body)
         log("DRY: wrote preview.html")
         log("subject:", subject)
         print(df.sort_values("score", ascending=False)

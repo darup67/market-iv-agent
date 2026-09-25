@@ -9,11 +9,11 @@
     <array>
         <string>/bin/sh</string>
         <string>-c</string>
-        <string>export FLIP_GMAIL_APP_PASSWORD=$(security find-generic-password -a darup67@gmail.com -s flip-notifier-gmail -w 2>/dev/null); exec /usr/bin/caffeinate -i /Users/dhruvpatel/biotech-iv-agent/.venv/bin/python /Users/dhruvpatel/biotech-iv-agent/agent.py</string>
+        <string>export FLIP_GMAIL_APP_PASSWORD=$(security find-generic-password -a darup67@gmail.com -s flip-notifier-gmail -w 2>/dev/null); exec /usr/bin/caffeinate -i /Users/dhruvpatel/market-iv-agent/.venv/bin/python /Users/dhruvpatel/market-iv-agent/agent.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent</string>
+    <string>/Users/dhruvpatel/market-iv-agent</string>
 
     <!-- Weekdays 16:30 local (ET), after the close. Calendar, not StartInterval:
          see the 2026-09-15 launchd StartInterval wedge. -->
@@ -30,10 +30,10 @@
     <false/>
 
     <key>StandardOutPath</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent/agent.out.log</string>
+    <string>/Users/dhruvpatel/market-iv-agent/agent.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/dhruvpatel/biotech-iv-agent/agent.err.log</string>
+    <string>/Users/dhruvpatel/market-iv-agent/agent.err.log</string>
 
     <key>ProcessType</key>
     <string>Background</string>
