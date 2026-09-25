@@ -97,11 +97,14 @@
     "implied_move": 0.15
   },
   "spreads": {
-    "candidates": 10,
-    "act_on": 2,
+    "candidates": 15,
+    "act_on": 5,
     "budget_total": 10000,
     "min_dte": 21,
     "max_dte": 45,
-    "max_leg_spread": 0.5
-  }
+    "max_leg_spread": 0.5,
+    "min_explode": 60
+  },
+  "email_mode": "handoff",
+  "_email_mode_comment": "handoff (since 2026-09-24): this agent sends no email; ~/market-lab/event-desk sends ONE consolidated bio/pharma email (weekdays ~10:05) with the 2-5 act-on spreads, the top 10 event names and this full report embedded. Set to \"send\" to go back to this agent emailing on its own."
 }

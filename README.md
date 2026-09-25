@@ -131,3 +131,21 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.dhruv.healthiv.open.
   through the shared `~/jev-client`. The IV math and the score stay in code.
   It starts shadow-only: answers are logged, and the email is unchanged until
   the logs have been reviewed.
+
+## Consolidated email (since 2026-09-24)
+
+`config.email_mode` is `"handoff"`: this agent **sends no email**. Each run writes
+`data/handoff/<date>-<run>.html` (the full report) and `data/handoff/handoff.json`
+(the run name and its spread tickets as plain JSON). `~/market-lab/event-desk` then
+sends the **one** bio/pharma email, weekdays at 10:05. That email leads with the 2–5
+act-on spreads from the 09:45 open-screen run, then the top 10 names by event impact
+(with Jev headline reads once a key exists), then this full report embedded. The
+16:30 close run still updates the snapshot, history and scorecard, but it no longer
+emails. Set `email_mode` to `"send"` to restore this agent's own emails.
+
+**Spread rule, changed at the user's request ("2–5 exploding bull call spread
+tickers"):** candidates are Bull-biased names with an explode score of
+`spreads.min_explode` (60) or more, up to `candidates` (15), ranked by bias. The
+liquidity gates are unchanged. Up to `act_on` (5) are acted on, at $2,000 each out of
+$10,000. On thin days fewer than 2 pass, and the email says so rather than loosening
+the rule.
