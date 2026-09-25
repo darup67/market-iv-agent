@@ -31,8 +31,8 @@ explode ≥ 60, liquid legs, 2–5 at $2,000 each, with $10k per sector.
 
 | launchd | when | does |
 |---|---|---|
-| `com.dhruv.healthiv.open` | weekdays 09:45 | health care open screen |
-| `com.dhruv.sectoriv.open` | weekdays 09:53 | `run-sectors.sh`, ~3 min for all 10 |
+| `com.dhruv.healthiv.open` | weekdays 10:52 | health care late-morning screen |
+| `com.dhruv.sectoriv.open` | weekdays 10:58 | `run-sectors.sh`, ~3–5 min for all 10 |
 | `com.dhruv.healthiv` | weekdays 16:30 | health care close run (data only) |
 
 ---
@@ -188,3 +188,5 @@ tickers"):** candidates are Bull-biased names with an explode score of
 liquidity gates are unchanged. Up to `act_on` (5) are acted on, at $2,000 each out of
 $10,000. On thin days fewer than 2 pass, and the email says so rather than loosening
 the rule.
+
+**Timing (2026-09-25):** the scans moved from 09:45/09:53 to **10:52/10:58**, and the emails to 11:05/11:10. At 09:45, Yahoo's delayed chains still showed opening quotes (60 of 380 names usable). By ~10 AM few names had traded the 500 contracts the candidate pool needs, so only 4 bio candidates reached the spread check. About 90 minutes of trading gives a fuller pool and a steadier Bull/Bear read. The run tag is now `late-morning screen`.
