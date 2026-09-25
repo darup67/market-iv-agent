@@ -27,7 +27,7 @@ Each sector keeps its own `data/sectors/<key>/`: snapshot, history (IV rank afte
 20 days), scorecard, spreads and handoff. The spread rule is shared: Bull bias,
 explode ≥ 60, liquid legs, 2–5 at $2,000 each, with $10k per sector.
 
-**Spread guardrails (2026-09-24, user: "only market odds of profit of 50% or more; reduce risk"):** `spreads.construction: "odds"` searches every call pair within ±25% of spot on the first 21–45 DTE expiry. A pair qualifies only with market-implied P(profit) ≥ 50% (so the breakeven is at or below spot), a max gain ≥ 0.5× risk, a strike width ≥ 2.5% of spot, qty ≤ 20 and liquid legs. The best reward/risk wins. Expect about 0.5–1.9× max gain rather than the old 2.5–3.5×; the expected value is about the cost either way. A catalyst or earnings before expiry is flagged ⚠, not excluded. `"atm_1sigma"` restores the old ATM/1σ rule.
+**Spread guardrails (2026-09-24, user: "only market odds of profit of 50% or more; reduce risk"):** `spreads.construction: "odds"` searches every call pair within ±25% of spot on the first 21–45 DTE expiry. A pair qualifies only with market-implied P(profit) ≥ 60% (raised from 50% the same day: the middle of the feasible band between the 50% floor and ~67%, where max gain falls under 0.5× risk), so the breakeven is below spot,, a max gain ≥ 0.5× risk, a strike width ≥ 2.5% of spot, qty ≤ 20 and liquid legs. The best reward/risk wins. Expect about 0.55–1.2× max gain, with a loss 2 times in 5, rather than the old 2.5–3.5×; the expected value is about the cost either way. A catalyst or earnings before expiry is flagged ⚠, not excluded. `"atm_1sigma"` restores the old ATM/1σ rule.
 
 | launchd | when | does |
 |---|---|---|
