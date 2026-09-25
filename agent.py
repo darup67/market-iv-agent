@@ -61,7 +61,10 @@ import spreads
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT / "data"
+# IV_DATA_ROOT redirects all data (e.g. a scratch folder for after-hours test runs, so
+# test quotes never land in the real history). Default: ./data
+DATA_ROOT = Path(os.environ.get("IV_DATA_ROOT") or ROOT / "data")
+DATA = DATA_ROOT
 HISTORY = DATA / "history.csv"      # one row per ticker per day; drives IV rank + 1d change
 PICKS = DATA / "picks.csv"          # explode picks, for the scorecard
 CFG = json.loads((ROOT / "config.json").read_text())
@@ -75,7 +78,7 @@ def apply_profile(name):
     global CFG, DATA, HISTORY, PICKS, ETFS, PROFILE
     prof = json.loads((ROOT / "profiles" / f"{name}.json").read_text())
     CFG = {**CFG, **{k: v for k, v in prof.items() if not k.startswith("_")}}
-    DATA = ROOT / "data" / "sectors" / name
+    DATA = DATA_ROOT / "sectors" / name
     HISTORY, PICKS = DATA / "history.csv", DATA / "picks.csv"
     ETFS = {e["etf"] for e in CFG["universe_etfs"]}
     PROFILE = name
