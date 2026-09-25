@@ -1,6 +1,7 @@
 """Bull call spreads for the top Bull-labelled names, with a fixed act-on rule.
 
-For each of the top `spreads.candidates` Bull names in the email pool (by bias):
+For each of the top `spreads.candidates` Bull names in the email pool whose explode
+score is at least `spreads.min_explode` (by bias):
   expiry  the first expiry `min_dte`..`max_dte` days out
   long    the listed call nearest spot
   short   the listed call nearest the 1σ bull level (spot·e^{σ√t}), above the long
@@ -11,8 +12,12 @@ Act-on rule (fixed before looking at any result; do not tune it on outcomes):
      its mid OR ≤ $0.10 wide (a dime is as tight as a cheap option gets), and each
      leg's open interest ≥ the order quantity
   2. still labelled Bull at run time
-  3. rank the survivors by bias (ties: higher probability of profit); the top
-     `act_on` split `budget_total` equally
+  3. rank the survivors by bias (ties: higher probability of profit); up to `act_on`
+     (5) are acted on, each sized at budget_total / act_on. Fewer pass on thin days;
+     the email says so rather than loosening the rule to reach a count.
+
+Changed 2026-09-24 at the user's request ("2-5 exploding bull call spread tickers
+per email"): min_explode gate added, act_on 2 -> 5, candidates 10 -> 15.
 Others are shown as "watch only" with the reason.
 
 Probabilities are risk-neutral (from the ATM IV): the market's own odds, not a forecast.
@@ -83,7 +88,8 @@ def build(r, cfg, today, budget, atm_for_expiry):
 def plan(pool, cfg, today, atm_for_expiry):
     """Tickets for the top Bull candidates; the first `act_on` passing the rule are marked act."""
     c = cfg["spreads"]
-    bulls = pool[pool.bias_label == "Bull"].sort_values("bias", ascending=False).head(c["candidates"])
+    bulls = pool[(pool.bias_label == "Bull") & (pool.score >= c.get("min_explode", 0))]
+    bulls = bulls.sort_values("bias", ascending=False).head(c["candidates"])
     if bulls.empty:
         return []
     per = c["budget_total"] / c["act_on"]
@@ -99,6 +105,7 @@ def plan(pool, cfg, today, atm_for_expiry):
             tk["fail"] = "; ".join(reasons) or None
         tk.setdefault("bias", r.bias)
         tk.setdefault("sector", r.sector)
+        tk["explode"] = float(r.score)
         tickets.append(tk)
     n = 0
     for tk in sorted(tickets, key=lambda x: (-x["bias"], -x.get("p_profit", 0))):

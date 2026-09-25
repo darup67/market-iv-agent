@@ -28,6 +28,7 @@ import io
 import json
 import math
 import os
+import re
 import smtplib
 import ssl
 import subprocess
@@ -587,12 +588,13 @@ def spreads_section(tickets, th, td):
                f"${total:,.0f} of ${c['budget_total']:,.0f}" if act else
                "<b>None of today's candidates passed the rule.</b> No spread to act on.")
     return (f"<p style='font-size:13px'>{summary}</p>"
-            f"<p style='font-size:12px;color:#777'>Top {c['candidates']} Bull names by bias. Each spread buys the call "
+            f"<p style='font-size:12px;color:#777'>Top {c['candidates']} Bull names by bias with an explode score of "
+            f"{c.get('min_explode', 0)} or more. Each spread buys the call "
             f"nearest the price and sells the call nearest the 1σ bull level, on the first expiry "
             f"{c['min_dte']}–{c['max_dte']} days out, at a limit of mid rounded up to $0.05. <b>Act-on rule</b> (fixed, not tuned on "
             f"results): both legs bid, each leg's spread under {c['max_leg_spread']:.0%} of mid or $0.10 wide, open interest at least "
-            f"the order size, still Bull; the top {c['act_on']} by bias (ties: higher P(profit)) split "
-            f"${c['budget_total']:,.0f}. P(profit) and P(max) are the options market's own odds, so each spread's expected "
+            f"the order size, still Bull; up to {c['act_on']} by bias (ties: higher P(profit)), "
+            f"${c['budget_total'] / c['act_on']:,.0f} each. P(profit) and P(max) are the options market's own odds, so each spread's expected "
             f"payoff is roughly its cost. Most expire worthless. Delayed quotes: re-check prices before entering. "
             f"This is a screen, not advice. Orders are entered by hand.</p>"
             f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
@@ -756,6 +758,30 @@ def send_email(subject, body_html):
     return False
 
 
+# ---------------------------------------------------------------- handoff
+def handoff(today, run, subject, body, tickets):
+    """Consolidated mode: no email from here. ~/market-lab/event-desk sends the one
+    bio/pharma email and embeds this report plus the spread tickets.
+
+    data/handoff/<date>-<run>.html is the full report; handoff.json says which run
+    finished last, with the tickets in plain JSON (spreads.csv stringifies tuples)."""
+    d = DATA / "handoff"
+    d.mkdir(exist_ok=True)
+    slug = re.sub(r"[^a-z0-9]+", "-", run.lower()).strip("-")
+    (d / f"{today}-{slug}.html").write_text(body)
+    def plain(v):
+        if isinstance(v, (tuple, list)):
+            return [plain(x) for x in v]
+        return v.item() if hasattr(v, "item") else v
+    meta = {"date": today.isoformat(), "run": run, "slug": slug, "subject": subject,
+            "finished": dt.datetime.now().isoformat(timespec="seconds"),
+            "tickets": [{k: plain(v) for k, v in t.items() if not k.startswith("_")} for t in tickets]}
+    (d / "handoff.json").write_text(json.dumps(meta, indent=1, default=str))
+    for old in sorted(d.glob("*.html"))[:-20]:
+        old.unlink()   # keep the last 20 reports
+    log(f"handoff written for event-desk ({run}); no email sent from here")
+
+
 # ---------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser()
@@ -856,7 +882,9 @@ def main():
             tk = pd.concat([old[(old["date"] != today.isoformat()) | (old["run"] != run)], tk])
         tk.to_csv(path, index=False)
 
-    if CFG["email_enabled"]:
+    if CFG.get("email_mode") == "handoff":
+        handoff(today, a.tag or "close", subject, body, tickets)
+    elif CFG["email_enabled"]:
         ok = send_email(subject, body)
         log("email sent" if ok else "email failed")
         if not ok:
