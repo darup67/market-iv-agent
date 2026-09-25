@@ -109,7 +109,8 @@
     "min_reward_risk": 0.5,
     "_comment": "construction 'odds' (2026-09-24): strike pair searched so market-implied P(profit) >= min_p_profit and max gain >= min_reward_risk x risk, liquid legs; best reward/risk wins. 'atm_1sigma' = the old ATM long / 1-sigma short rule. min_p_profit 0.60 since 2026-09-24: middle of the feasible band (50% floor to ~67%, where max gain falls under the 0.5x guardrail); ~0.67x payoff.",
     "min_width_pct": 0.025,
-    "max_qty": 20
+    "max_qty": 20,
+    "max_fair_dev": 0.2
   },
   "email_mode": "handoff",
   "_email_mode_comment": "handoff (since 2026-09-24): this agent sends no email; ~/market-lab/event-desk sends ONE consolidated bio/pharma email (weekdays ~10:05) with the 2-5 act-on spreads, the top 10 event names and this full report embedded. Set to \"send\" to go back to this agent emailing on its own."

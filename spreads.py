@@ -61,6 +61,11 @@ def leg_ok(row, qty, max_spread):
     return None
 
 
+def bs_call(spot, k, iv, t, r=0.04):
+    d1 = (math.log(spot / k) + (r + 0.5 * iv * iv) * t) / (iv * math.sqrt(t))
+    return spot * _N(d1) - k * math.exp(-r * t) * _N(d1 - iv * math.sqrt(t))
+
+
 def pick_odds(calls, spot, iv, t, c, budget):
     """Best (reward/risk) call pair meeting the odds, payoff and liquidity guardrails.
     Returns (long_k, short_k, limit, qty) or a string saying why none qualified."""
@@ -79,8 +84,14 @@ def pick_odds(calls, spot, iv, t, c, budget):
                 continue
             if mid <= 0 or mid >= width:
                 continue
-            limit = math.ceil(mid * 20 - 1e-9) / 20
+            limit = max(0.05, math.ceil(mid * 20 - 1e-9) / 20)  # never $0: a sub-cent mid rounded to 0 and divided by zero
             if limit >= width:
+                continue
+            # Fair-value guard: a quoted mid far from the model value is a stale quote, not an edge
+            # (VKTX 29/30.5 quoted $0.70 against ~$1.45 fair at 09:53 on 2026-09-25, "86% odds").
+            theo = bs_call(spot, k1, iv, t) - bs_call(spot, k2, iv, t)
+            if abs(mid - theo) > max(0.10, c.get("max_fair_dev", 0.2) * width):
+                why = "quotes inconsistent with fair value (stale)"
                 continue
             p = p_above(spot, k1 + limit, iv, t)
             rr = (width - limit) / limit
@@ -147,7 +158,7 @@ def build(r, cfg, today, budget, atm_for_expiry):
     width = short_k - long_k
     if mid <= 0 or mid >= width:
         return {"ticker": r.ticker, "fail": "spread mid not tradable"}
-    limit = math.ceil(mid * 20 - 1e-9) / 20
+    limit = max(0.05, math.ceil(mid * 20 - 1e-9) / 20)  # never $0: a sub-cent mid rounded to 0 and divided by zero
     qty = int(budget // (limit * 100))
     be = long_k + limit
     return _ticket(r, exp, spot, iv, t, long_k, short_k, L, H, limit, qty, width, be)
