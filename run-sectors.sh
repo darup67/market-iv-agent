@@ -6,6 +6,6 @@ cd "$(dirname "$0")"
 for p in profiles/*.json; do
   key=$(basename "$p" .json)
   echo "$(date '+%m-%d %H:%M:%S') === $key"
-  .venv/bin/python -u agent.py --profile "$key" --tag "late-morning screen" || echo "$(date '+%H:%M:%S') $key FAILED ($?)"
+  "$HOME/.venvs/market-ml/bin/python" -u agent.py --profile "$key" --tag "late-morning screen" || echo "$(date '+%H:%M:%S') $key FAILED ($?)"
 done
 echo "$(date '+%m-%d %H:%M:%S') all sectors done"
