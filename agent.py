@@ -592,6 +592,33 @@ def uoa_section(df, th, td):
             f"<table style='border-collapse:collapse;width:100%'>{head}{body}</table>")
 
 
+def gex_for(sym):
+    """GEX + options-flow summary for one ticker from Cboe delayed chains (~/jev-client/gexlib.py). Context only; None when unavailable."""
+    try:
+        sys.path.insert(0, os.path.expanduser("~/jev-client"))
+        import gexlib
+        return gexlib.summarize(sym)
+    except Exception:
+        return None
+
+
+def enrich_gex(tickets):
+    """Add the gamma/flow line to each spread ticket (plain columns, so spreads.csv and handoff.json carry it). A failure never touches the email."""
+    for t in tickets:
+        g = gex_for(t["ticker"])
+        if not g:
+            continue
+        t["gex_line"] = g["line"]
+        t["gex_regime"], t["gex_call_wall"], t["gex_put_wall"], t["gex_flip"] = g["regime"], g["call_wall"], g["put_wall"], g["flip"]
+        t["flow_pc_vol"], t["flow_bias"] = g["flow"]["pc_vol"], g["flow"]["bias"]
+        note = ""
+        if t.get("short") and g["call_wall"] and t["short"] > g["call_wall"]:
+            note = f"short strike ${t['short']:g} is above the call wall ${g['call_wall']:g}: dealer hedging may cap the rise before max gain"
+        elif t.get("long") and g["put_wall"] and t["long"] < g["put_wall"] and g["regime"] == "negative":
+            note = f"long strike ${t['long']:g} sits under the put wall in negative gamma: a drop can accelerate"
+        t["gex_note"] = note
+
+
 def spreads_section(tickets, th, td):
     c = CFG["spreads"]
     if not tickets:
@@ -599,12 +626,12 @@ def spreads_section(tickets, th, td):
     act = [t for t in tickets if t.get("act")]
     head = "".join(f"<th {th}>{h}</th>" for h in (
         "", "Ticker", "Bias", "Expiry", "Buy (bid/ask, OI)", "Sell (bid/ask, OI)", "Limit", "Qty", "Cost = max loss",
-        "Max gain", "R:R", "Breakeven", "P(profit)", "P(max)", "Catalyst"))
+        "Max gain", "R:R", "Breakeven", "P(profit)", "P(max)", "Catalyst", "Gamma / flow"))
     body = ""
     for t in tickets:
         if t.get("limit") is None:
             body += (f"<tr><td {td}>👀</td><td {td}><b>{t['ticker']}</b></td><td {td}>{t['bias']:+.0f}</td>"
-                     f"<td {td} colspan=12>watch only: {html.escape(t['fail'])}</td></tr>")
+                     f"<td {td} colspan=13>watch only: {html.escape(t['fail'])}</td></tr>")
             continue
         lb, la, lo = t["long_q"]
         hb, ha, ho = t["short_q"]
@@ -619,7 +646,8 @@ def spreads_section(tickets, th, td):
                  f"<td {style}>${t['max_gain']:,.0f}</td><td {style}>{t['rr']:.1f}</td>"
                  f"<td {style}>${t['be']:,.2f} ({t['be'] / t['spot'] - 1:+.0%})</td>"
                  f"<td {style}>{t['p_profit']:.0%}</td><td {style}>{t['p_max']:.0%}</td>"
-                 f"<td {style}>{html.escape(t.get('catalysts') or '—')}</td></tr>")
+                 f"<td {style}>{html.escape(t.get('catalysts') or '—')}</td>"
+                 f"<td {style}>{html.escape(t.get('gex_line') or '—')}" + (f"<br><span style='color:#b45309;font-size:11px'>{html.escape(t['gex_note'])}</span>" if t.get("gex_note") else "") + "</td></tr>")
     total = sum(t["cost"] for t in act)
     summary = (f"<b>Act on {len(act)} of {len(tickets)}:</b> {', '.join(t['ticker'] for t in act)} · "
                f"${total:,.0f} of ${c['budget_total']:,.0f}" if act else
@@ -662,6 +690,7 @@ def deep_dive(r, td):
 <tr><td {td}>Net premium (est.)</td><td {td}>{net}</td></tr>
 <tr><td {td}>Unusual activity</td><td {td}>{uoa_text(r)}</td></tr>
 <tr><td {td}>Busiest contracts</td><td {td}>{html.escape(r.top_strikes) or "—"}</td></tr>
+<tr><td {td}>Gamma exposure / flow</td><td {td}>{html.escape((gex_for(r.ticker) or {}).get("line") or "—")}</td></tr>
 </table></div>"""
 
 
@@ -893,6 +922,7 @@ def main():
     subject = (f"{CFG.get('emoji', '🧬')} {CFG.get('title', 'Health care IV')} · Top IV {top_iv.ticker} {top_iv.iv30*100:.0f}% · "
                f"Watch {top_ex.ticker}" + (f" {top_ex.bias_label}" if isinstance(top_ex.bias_label, str) else "") + (f" (±{top_ex.implied_move*100:.0f}% by {top_ex.front_exp[5:]})" if pd.notna(top_ex.implied_move) else ""))
     tickets = spreads.plan(email_pool(df), CFG, today, atm_for_expiry)
+    enrich_gex(tickets)
     act = [t["ticker"] for t in tickets if t.get("act")]
     subject += f" · ACT {'+'.join(act)}" if act else " · no spread passes"
     if a.tag:
